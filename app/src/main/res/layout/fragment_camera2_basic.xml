@@ -15,8 +15,20 @@
             android:layout_height="wrap_content"
             android:layout_gravity="center"
             android:text="@string/picture"
+            android:layout_marginBottom="26dp"
             android:layout_alignParentBottom="true"
-            android:layout_centerHorizontal="true"
-            android:layout_marginBottom="25dp" />
+            android:layout_alignParentStart="true"
+            android:layout_marginStart="55dp" />
+
+    <Button
+        android:id="@+id/pickfromgallery"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text="@string/pickfromgallery"
+        android:layout_alignBaseline="@+id/picture"
+        android:layout_alignBottom="@+id/picture"
+        android:layout_toEndOf="@+id/picture"
+        android:layout_marginStart="40dp" />
 
 </RelativeLayout>

@@ -49,11 +49,15 @@ import android.view.Surface;
 import android.view.TextureView;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
 import android.widget.Toast;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -419,6 +423,13 @@ public class Camera2BasicFragment extends Fragment
     @Override
     public void onViewCreated(final View view, Bundle savedInstanceState) {
         view.findViewById(R.id.picture).setOnClickListener(this);
+        view.findViewById(R.id.pickfromgallery).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                Intent i = new Intent(getActivity(), GalleryActivity.class);
+                startActivity(i);
+            }
+        });
         mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);
     }
 
@@ -916,6 +927,8 @@ public class Camera2BasicFragment extends Fragment
             mImage = image;
             mFile = file;
         }
+
+
 
         @Override
         public void run() {

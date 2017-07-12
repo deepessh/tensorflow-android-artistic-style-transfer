@@ -12,4 +12,5 @@
     <string name="intro_message">Welcome</string>
     <string name="apply_style">Apply Style</string>
     <string name="share">Share</string>
+    <string name="pickfromgallery">Pick From Gallery</string>
 </resources>

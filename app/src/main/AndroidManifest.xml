@@ -20,7 +20,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".ShowImageActivity"></activity>
+        <activity android:name=".ShowImageActivity" />
+        <activity android:name=".GalleryActivity"></activity>
     </application>
 
 </manifest>
