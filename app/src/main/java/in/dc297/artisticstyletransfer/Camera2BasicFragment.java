@@ -63,6 +63,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
@@ -490,7 +491,7 @@ public class Camera2BasicFragment extends Fragment
      * @param width  The width of available size for camera preview
      * @param height The height of available size for camera preview
      */
-    private void setUpCameraOutputs(int width, int height) {
+    private void setUpCameraOutputs(final int width, final int height) {
         Activity activity = getActivity();
         CameraManager manager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
         try {
@@ -515,9 +516,23 @@ public class Camera2BasicFragment extends Fragment
                     Log.i(TAG,String.valueOf(map.getOutputSizes(ImageFormat.JPEG)[i].getWidth()) + "x" + String.valueOf(map.getOutputSizes(ImageFormat.JPEG)[i].getHeight()));
                 }*/
                 // For still image captures, we use the largest available size.
+                List<Size> camSupportedSize = Arrays.asList(map.getOutputSizes(ImageFormat.JPEG));
+                Log.d(TAG,camSupportedSize.toString());
+                List<Size> matchingSize = new ArrayList<Size>();
+                Iterator iterator = camSupportedSize.iterator();
+                while (iterator.hasNext()) {
+                    Size thisSize = (Size) iterator.next();
+                    Log.d(TAG,String.valueOf(thisSize.getWidth()*1.0d/thisSize.getHeight()*1.0d));
+                    Log.d(TAG,String.valueOf(width*1.0d/height*1.0d));
+                    if((thisSize.getWidth()*1.0d/thisSize.getHeight()*1.0d==width*1.0d/height*1.0d) || (thisSize.getWidth()*1.0d/thisSize.getHeight()*1.0d==height*1.0d/width*1.0d)){
+                        matchingSize.add(thisSize);
+                    }
+                }
+                Log.d(TAG,matchingSize.toString());
                 Size largest = Collections.max(
-                        Arrays.asList(map.getOutputSizes(ImageFormat.JPEG)),
+                        (matchingSize.size()>0?matchingSize:camSupportedSize),
                         new CompareSizesByArea());
+                Log.d(TAG,largest.toString());
                 mImageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(),
                         ImageFormat.JPEG, /*maxImages*/2);
                 mImageReader.setOnImageAvailableListener(

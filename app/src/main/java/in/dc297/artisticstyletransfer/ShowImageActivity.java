@@ -7,6 +7,8 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.graphics.Canvas;
+import android.graphics.Paint;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -33,7 +35,6 @@ import java.util.ArrayList;
 
 public class ShowImageActivity extends Activity implements ActivityCompat.OnRequestPermissionsResultCallback{
 
-    private int frameNum = 0;
     private boolean debug = false;
     private static final String MODEL_FILE = "file:///android_asset/stylize_quantized.pb";
     private static final String INPUT_NODE = "input";
@@ -41,14 +42,18 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
     private static final String OUTPUT_NODE = "transformer/expand/conv3/conv/Sigmoid";
     private static final int NUM_STYLES = 26;
 
+    private static final String TAG = "ShowImageActivity";
+
     private final float[] styleVals = new float[NUM_STYLES];
     private int[] intValues;
     private float[] floatValues;
 
     private TensorFlowInferenceInterface inferenceInterface;
     private ImageView mPreviewImage = null;
+    private ImageView mOriginalImage = null;
     private String mImagePath = "";
     private Bitmap mImgBitmap = null;
+    private Bitmap mOrigBitmap = null;
 
     private ProgressDialog progress =null;
     private Handler handler;
@@ -64,14 +69,13 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
 
     private static final int REQUEST_STORAGE_PERMISSION = 1;
 
-    private TextView mProgressTV;
-
     private SeekBar mSeekBar;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_show_image);
         mPreviewImage = (ImageView) findViewById(R.id.image_preview);
+        mOriginalImage = (ImageView) findViewById(R.id.image_orig);
         Intent recvdIntent = getIntent();
         mImagePath = recvdIntent.getStringExtra("filepath");
         getPreview();
@@ -124,14 +128,24 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
                 }
                 if(mImgBitmap!=null) {
                     try{
-                    ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-                    mImgBitmap.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
-                    String path = MediaStore.Images.Media.insertImage(ShowImageActivity.this.getContentResolver(), mImgBitmap, "Title", null);
-                    final Intent intent = new Intent(     android.content.Intent.ACTION_SEND);
-                    intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                    intent.putExtra(Intent.EXTRA_STREAM, Uri.parse(path));
-                    intent.setType("image/png");
-                    startActivity(intent);
+                        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
+                        mImgBitmap.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
+                        Bitmap newBitmap = Bitmap.createBitmap(mImgBitmap.getWidth(), mImgBitmap.getHeight(), Bitmap.Config.ARGB_8888);
+                        // create a canvas where we can draw on
+                        Canvas canvas = new Canvas(newBitmap);
+                        // create a paint instance with alpha
+                        canvas.drawBitmap(mOrigBitmap,0,0,null);
+                        Paint alphaPaint = new Paint();
+                        alphaPaint.setAlpha(42);
+                        // now lets draw using alphaPaint instance
+                        canvas.drawBitmap(mImgBitmap, 0, 0, alphaPaint);
+
+                        String path = MediaStore.Images.Media.insertImage(ShowImageActivity.this.getContentResolver(), newBitmap, "Title", null);
+                        final Intent intent = new Intent(     android.content.Intent.ACTION_SEND);
+                        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                        intent.putExtra(Intent.EXTRA_STREAM, Uri.parse(path));
+                        intent.setType("image/png");
+                        startActivity(intent);
                     }
                     catch(Exception e){
                         e.printStackTrace();
@@ -163,11 +177,11 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
             }
         }));
         mSeekBar = (SeekBar) findViewById(R.id.seekBar);
-        mProgressTV = (TextView) findViewById(R.id.seek_bar_prog);
+        mSeekBar.setProgress(100);
         mSeekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int i, boolean b) {
-
+                mPreviewImage.setAlpha(seekBar.getProgress()/100.0f);
             }
 
             @Override
@@ -177,9 +191,10 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-                mProgressTV.setText(seekBar.getProgress() + "%");
             }
         });
+        mOriginalImage.setImageBitmap((getPreview()));
+        mPreviewImage.setImageBitmap(getPreview());
     }
 
     private void loadStyleBitmaps(){
@@ -219,7 +234,8 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
                 });
             }
         });
-        mPreviewImage.setImageBitmap(getPreview());
+        //mOriginalImage.setImageBitmap((getPreview()));
+        //mPreviewImage.setImageBitmap(getPreview());
     }
     private Bitmap getPreview() {
 
@@ -236,17 +252,13 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
 
         // Get the dimensions of the View
         int targetW = getWindowManager().getDefaultDisplay().getWidth();
-        int targetH = getWindowManager().getDefaultDisplay().getWidth()* photoH / photoW;
+        if(targetW>photoW) targetW = photoW;
+        int targetH = targetW * photoH / photoW;
+
+        Log.d(TAG,targetH + ":height, width:" + targetW);
 
         mImgBitmap = Bitmap.createScaledBitmap(mImgBitmap,targetW,targetH,false);
-        int margin = targetH - targetW;
-        if(margin<0){//width>height
-            margin= margin* -1;
-            mImgBitmap = Bitmap.createBitmap(mImgBitmap,margin,0,targetH,targetH);
-        }
-        else{
-            mImgBitmap = Bitmap.createBitmap(mImgBitmap,0,margin,targetW,targetW);
-        }
+        mOrigBitmap = Bitmap.createScaledBitmap(mImgBitmap,targetW,targetH,false);
         return mImgBitmap;
     }
 
@@ -258,12 +270,10 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
         mImgBitmap = getPreview();//resetImage
         for(int i = 0;i<NUM_STYLES;i++){
             if(i==mSelectedStyle) {
-                styleVals[i] = mSeekBar.getProgress()/100.0f;
-                Log.i("ShowImageActivity","Progress"+styleVals[i]);
+                styleVals[i] = 1.0f;
             }
             else styleVals[i] = 0.0f;
         }
-        ++frameNum;
         mImgBitmap.getPixels(intValues, 0, mImgBitmap.getWidth(), 0, 0, mImgBitmap.getWidth(), mImgBitmap.getHeight());
 
             for (int i = 0; i < intValues.length; ++i) {
@@ -275,7 +285,7 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
 
         // Copy the input data into TensorFlow.
         inferenceInterface.feed(
-                INPUT_NODE, floatValues, 1, mImgBitmap.getWidth(), mImgBitmap.getHeight(), 3);
+                INPUT_NODE, floatValues, 1, mImgBitmap.getHeight(), mImgBitmap.getWidth(), 3);
         inferenceInterface.feed(STYLE_NODE, styleVals, NUM_STYLES);
 
         inferenceInterface.run(new String[] {OUTPUT_NODE}, isDebug());

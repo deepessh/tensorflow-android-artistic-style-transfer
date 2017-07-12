@@ -1,17 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context="in.dc297.artisticstyletransfer.ShowImageActivity">
 
     <ImageView
+        android:id="@+id/image_orig"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
+        android:layout_height="match_parent"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentTop="true" />
+
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:layout_alignParentStart="true"
         android:layout_alignParentTop="true"
-        android:id="@+id/image_preview" />
+        android:id="@+id/image_preview"
+        />
+
     <Button
         android:id="@+id/apply_button"
         android:layout_width="wrap_content"
@@ -50,18 +58,9 @@
         android:layout_marginBottom="17dp">
     <SeekBar
         android:id="@+id/seekBar"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_alignParentStart="true"
-        android:layout_weight="0.97" />
-
-        <TextView
-            android:id="@+id/seek_bar_prog"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentEnd="true"
-            android:text="0"
-            android:paddingLeft="5dp"/>
+        android:layout_alignParentStart="true" />
     </LinearLayout>
 
 
