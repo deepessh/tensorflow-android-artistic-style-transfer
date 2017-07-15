@@ -136,7 +136,7 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
                         // create a paint instance with alpha
                         canvas.drawBitmap(mOrigBitmap,0,0,null);
                         Paint alphaPaint = new Paint();
-                        alphaPaint.setAlpha(42);
+                        alphaPaint.setAlpha(mSeekBar.getProgress()*255/100);
                         // now lets draw using alphaPaint instance
                         canvas.drawBitmap(mImgBitmap, 0, 0, alphaPaint);
 
