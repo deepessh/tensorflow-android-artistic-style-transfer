@@ -125,6 +125,8 @@ public class Camera2BasicFragment extends Fragment
      */
     private static final int MAX_PREVIEW_HEIGHT = 1080;
 
+    private boolean mFront = false;
+
     /**
      * {@link TextureView.SurfaceTextureListener} handles several lifecycle events on a
      * {@link TextureView}.
@@ -290,7 +292,8 @@ public class Camera2BasicFragment extends Fragment
                     break;
                 }
                 case STATE_WAITING_LOCK: {
-                    Integer afState = result.get(CaptureResult.CONTROL_AF_STATE);
+                    captureStillPicture();
+                    /*Integer afState = result.get(CaptureResult.CONTROL_AF_STATE);
                     if (afState == null) {
                         captureStillPicture();
                     } else if (CaptureResult.CONTROL_AF_STATE_FOCUSED_LOCKED == afState ||
@@ -304,7 +307,7 @@ public class Camera2BasicFragment extends Fragment
                         } else {
                             runPrecaptureSequence();
                         }
-                    }
+                    }*/
                     break;
                 }
                 case STATE_WAITING_PRECAPTURE: {
@@ -432,6 +435,14 @@ public class Camera2BasicFragment extends Fragment
             }
         });
         mTextureView = (AutoFitTextureView) view.findViewById(R.id.texture);
+        view.findViewById(R.id.showfrontcam).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mFront = !mFront;
+                onPause();
+                onResume();
+            }
+        });
     }
 
     @Override
@@ -502,7 +513,11 @@ public class Camera2BasicFragment extends Fragment
 
                 // We don't use a front facing camera in this sample.
                 Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
-                if (facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT) {
+                if (facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT && !mFront) {
+                    continue;
+                }
+
+                if(facing != null && facing == CameraCharacteristics.LENS_FACING_BACK && mFront){
                     continue;
                 }
 

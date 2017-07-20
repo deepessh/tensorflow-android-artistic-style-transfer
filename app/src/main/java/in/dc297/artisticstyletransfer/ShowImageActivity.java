@@ -31,6 +31,9 @@ import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
 import java.util.ArrayList;
 
 public class ShowImageActivity extends Activity implements ActivityCompat.OnRequestPermissionsResultCallback{
@@ -141,7 +144,7 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
                         canvas.drawBitmap(mImgBitmap, 0, 0, alphaPaint);
 
                         String path = MediaStore.Images.Media.insertImage(ShowImageActivity.this.getContentResolver(), newBitmap, "Title", null);
-                        final Intent intent = new Intent(     android.content.Intent.ACTION_SEND);
+                        final Intent intent = new Intent(android.content.Intent.ACTION_SEND);
                         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
                         intent.putExtra(Intent.EXTRA_STREAM, Uri.parse(path));
                         intent.setType("image/png");
@@ -193,8 +196,8 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
             public void onStopTrackingTouch(SeekBar seekBar) {
             }
         });
-        mOriginalImage.setImageBitmap((getPreview()));
-        mPreviewImage.setImageBitmap(getPreview());
+        mOriginalImage.setImageBitmap(mOrigBitmap);
+        mPreviewImage.setImageBitmap(mImgBitmap);
     }
 
     private void loadStyleBitmaps(){
@@ -241,10 +244,10 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
 
         // Get the dimensions of the bitmap
         BitmapFactory.Options bmOptions = new BitmapFactory.Options();
-        bmOptions.inJustDecodeBounds = true;
 
         // Decode the image file into a Bitmap sized to fill the View
-        bmOptions.inJustDecodeBounds = false;
+        //bmOptions.inJustDecodeBounds = false;
+        bmOptions.inMutable = true;
 
         mImgBitmap = BitmapFactory.decodeFile(mImagePath, bmOptions);
         int photoW = mImgBitmap.getWidth();
@@ -252,13 +255,14 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
 
         // Get the dimensions of the View
         int targetW = getWindowManager().getDefaultDisplay().getWidth();
-        if(targetW>photoW) targetW = photoW;
-        int targetH = targetW * photoH / photoW;
-
-        Log.d(TAG,targetH + ":height, width:" + targetW);
-
-        mImgBitmap = Bitmap.createScaledBitmap(mImgBitmap,targetW,targetH,false);
-        mOrigBitmap = Bitmap.createScaledBitmap(mImgBitmap,targetW,targetH,false);
+        if(targetW<photoW) {
+            int targetH = targetW * photoH / photoW;
+            mImgBitmap = Bitmap.createScaledBitmap(mImgBitmap, targetW, targetH, false);
+            mOrigBitmap = Bitmap.createScaledBitmap(mImgBitmap, targetW, targetH, false);
+        }
+        else{
+            mOrigBitmap = BitmapFactory.decodeFile(mImagePath, bmOptions);
+        }
         return mImgBitmap;
     }
 
@@ -267,7 +271,7 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
     }
 
     private void stylizeImage() {
-        mImgBitmap = getPreview();//resetImage
+        mImgBitmap = Bitmap.createBitmap(mOrigBitmap);
         for(int i = 0;i<NUM_STYLES;i++){
             if(i==mSelectedStyle) {
                 styleVals[i] = 1.0f;
@@ -287,8 +291,8 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
         inferenceInterface.feed(
                 INPUT_NODE, floatValues, 1, mImgBitmap.getHeight(), mImgBitmap.getWidth(), 3);
         inferenceInterface.feed(STYLE_NODE, styleVals, NUM_STYLES);
-
         inferenceInterface.run(new String[] {OUTPUT_NODE}, isDebug());
+        floatValues = new float[mImgBitmap.getWidth()*(mImgBitmap.getHeight()+10)*3];
         inferenceInterface.fetch(OUTPUT_NODE, floatValues);
 
         for (int i = 0; i < intValues.length; ++i) {
@@ -298,7 +302,7 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
                             | (((int) (floatValues[i * 3 + 1] * 255)) << 8)
                             | ((int) (floatValues[i * 3 + 2] * 255));
         }
-
+        floatValues = new float[mImgBitmap.getWidth()*(mImgBitmap.getHeight())*3];
         mImgBitmap.setPixels(intValues, 0, mImgBitmap.getWidth(), 0, 0, mImgBitmap.getWidth(), mImgBitmap.getHeight());
         runOnUiThread(new Runnable() {
             @Override

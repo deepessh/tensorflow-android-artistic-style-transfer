@@ -1,3 +1,6 @@
+project.ext.ASSET_DIR = projectDir.toString() + '/assets'
+project.ext.TMP_DIR   = project.buildDir.toString() + '/downloads'
+
 apply plugin: 'com.android.application'
 
 android {
@@ -28,7 +31,7 @@ dependencies {
     compile 'com.android.support.constraint:constraint-layout:1.0.2'
     compile 'com.android.support:support-v4:25.3.1'
     compile 'com.android.support:support-v13:25.3.1'
-    compile 'org.tensorflow:tensorflow-android:1.2.0-preview'
+    compile 'org.tensorflow:tensorflow-android:+'
     compile 'com.android.support:recyclerview-v7:25.3.1'
     testCompile 'junit:junit:4.12'
 }

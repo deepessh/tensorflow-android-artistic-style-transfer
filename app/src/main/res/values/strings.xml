@@ -13,4 +13,5 @@
     <string name="apply_style">Apply Style</string>
     <string name="share">Share</string>
     <string name="pickfromgallery">Pick From Gallery</string>
+    <string name="front_cam">View Front Camera</string>
 </resources>
