@@ -8,6 +8,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
+import android.graphics.Color;
 import android.graphics.Paint;
 import android.net.Uri;
 import android.os.Handler;
@@ -17,23 +18,22 @@ import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.content.ContextCompat;
 import android.os.Bundle;
+import android.support.v7.graphics.Palette;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.view.View;
+import android.view.Window;
+import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.SeekBar;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
-import java.nio.FloatBuffer;
 import java.util.ArrayList;
 
 public class ShowImageActivity extends Activity implements ActivityCompat.OnRequestPermissionsResultCallback{
@@ -76,45 +76,20 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        requestWindowFeature(Window.FEATURE_NO_TITLE);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
+                WindowManager.LayoutParams.FLAG_FULLSCREEN);
         setContentView(R.layout.activity_show_image);
         mPreviewImage = (ImageView) findViewById(R.id.image_preview);
         mOriginalImage = (ImageView) findViewById(R.id.image_orig);
         Intent recvdIntent = getIntent();
         mImagePath = recvdIntent.getStringExtra("filepath");
         getPreview();
-        Button applyButton = (Button) findViewById(R.id.apply_button);
-        applyButton.setOnClickListener(new View.OnClickListener() {
-            @Override
-            public void onClick(View view) {
-                progress = new ProgressDialog(ShowImageActivity.this);
-                progress.setTitle("Loading");
-                progress.setMessage("Wait while loading...");
-                progress.setCancelable(false); // disable dismiss by tapping outside of the dialog
-                progress.show();
-                runInBackground(
-                        new Runnable() {
-                            @Override
-                            public void run() {
-                                try {
-                                    stylizeImage();
-                                }
-                                catch(Exception e){
-                                    e.printStackTrace();
-                                    runOnUiThread(new Runnable() {
-                                        @Override
-                                        public void run() {
-                                            Toast.makeText(getApplicationContext(),"Oops! Seems like your phone can't handle the pressure :P",Toast.LENGTH_SHORT).show();
-                                            if(progress!=null){
-                                                progress.dismiss();
-                                            }
-                                        }
-                                    });
-                                }
-                            }
-                        });
+        Palette.from(mOrigBitmap).generate(new Palette.PaletteAsyncListener() {
+            public void onGenerated(Palette p) {
+                mPreviewImage.setBackgroundColor(p.getDominantColor(Color.BLACK));
             }
         });
-
         intValues = new int[mImgBitmap.getWidth() * mImgBitmap.getHeight()];
         floatValues = new float[mImgBitmap.getWidth() * mImgBitmap.getHeight() * 3];
 
@@ -173,6 +148,32 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
             @Override
             public void onItemClick(View view, int position) {
                 mSelectedStyle = position;
+                progress = new ProgressDialog(ShowImageActivity.this);
+                progress.setTitle("Loading");
+                progress.setMessage("Wait while loading...");
+                progress.setCancelable(false); // disable dismiss by tapping outside of the dialog
+                progress.show();
+                runInBackground(
+                        new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    stylizeImage();
+                                }
+                                catch(Exception e){
+                                    e.printStackTrace();
+                                    runOnUiThread(new Runnable() {
+                                        @Override
+                                        public void run() {
+                                            Toast.makeText(getApplicationContext(),"Oops! Seems like your phone can't handle the pressure :P",Toast.LENGTH_SHORT).show();
+                                            if(progress!=null){
+                                                progress.dismiss();
+                                            }
+                                        }
+                                    });
+                                }
+                            }
+                        });
             }
 
             @Override
@@ -252,17 +253,31 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
         mImgBitmap = BitmapFactory.decodeFile(mImagePath, bmOptions);
         int photoW = mImgBitmap.getWidth();
         int photoH = mImgBitmap.getHeight();
-
-        // Get the dimensions of the View
-        int targetW = getWindowManager().getDefaultDisplay().getWidth();
-        if(targetW<photoW) {
-            int targetH = targetW * photoH / photoW;
-            mImgBitmap = Bitmap.createScaledBitmap(mImgBitmap, targetW, targetH, false);
-            mOrigBitmap = Bitmap.createScaledBitmap(mImgBitmap, targetW, targetH, false);
+        int targetW;
+        int targetH;
+        if(photoW>photoH){
+            targetH = getWindowManager().getDefaultDisplay().getWidth();
+            if(targetH>photoH) {
+                mOrigBitmap = BitmapFactory.decodeFile(mImagePath, bmOptions);
+            }
+            else{
+                targetW = targetH*photoW / photoH;
+                mImgBitmap = Bitmap.createScaledBitmap(mImgBitmap, targetW, targetH, false);
+                mOrigBitmap = Bitmap.createScaledBitmap(mImgBitmap, targetW, targetH, false);
+            }
         }
-        else{
-            mOrigBitmap = BitmapFactory.decodeFile(mImagePath, bmOptions);
+        else {
+            targetW = getWindowManager().getDefaultDisplay().getWidth();
+            if(targetW>photoW){
+                mOrigBitmap = BitmapFactory.decodeFile(mImagePath, bmOptions);
+            }
+            else {
+                targetH = targetW * photoH / photoW;
+                mImgBitmap = Bitmap.createScaledBitmap(mImgBitmap, targetW, targetH, false);
+                mOrigBitmap = Bitmap.createScaledBitmap(mImgBitmap, targetW, targetH, false);
+            }
         }
+        Log.d(TAG,mImgBitmap.getHeight()+" :height - width: "+mImgBitmap.getWidth());
         return mImgBitmap;
     }
 
@@ -292,7 +307,7 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
                 INPUT_NODE, floatValues, 1, mImgBitmap.getHeight(), mImgBitmap.getWidth(), 3);
         inferenceInterface.feed(STYLE_NODE, styleVals, NUM_STYLES);
         inferenceInterface.run(new String[] {OUTPUT_NODE}, isDebug());
-        floatValues = new float[mImgBitmap.getWidth()*(mImgBitmap.getHeight()+10)*3];
+        floatValues = new float[mImgBitmap.getWidth()*(mImgBitmap.getHeight()+10)*3];//add a little buffer to the float array because tensorflow sometimes returns larger images than what is given as input
         inferenceInterface.fetch(OUTPUT_NODE, floatValues);
 
         for (int i = 0; i < intValues.length; ++i) {
@@ -336,6 +351,9 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
         if (requestCode == REQUEST_STORAGE_PERMISSION) {
             if (grantResults.length != 1 || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
                 Camera2BasicFragment.ErrorDialog.newInstance(getString(R.string.request_permission_storage)).show(getFragmentManager(),"dialog");
+            }
+            else{
+                shareButton.performClick();
             }
         } else {
             shareButton.performClick();

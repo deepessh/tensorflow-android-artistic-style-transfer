@@ -14,7 +14,6 @@
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
         <activity android:name=".MainActivity"
-            android:theme="@android:style/Theme.NoTitleBar.Fullscreen"
             android:screenOrientation="portrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -23,8 +22,7 @@
             </intent-filter>
         </activity>
         <activity android:name=".ShowImageActivity"
-            android:screenOrientation="portrait"
-            android:theme="@android:style/Theme.NoTitleBar.Fullscreen"/>
+            android:screenOrientation="portrait"/>
         <activity android:name=".GalleryActivity"
             android:screenOrientation="portrait"></activity>
     </application>

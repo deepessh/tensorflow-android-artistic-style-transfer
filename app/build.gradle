@@ -33,5 +33,6 @@ dependencies {
     compile 'com.android.support:support-v13:25.3.1'
     compile 'org.tensorflow:tensorflow-android:+'
     compile 'com.android.support:recyclerview-v7:25.3.1'
+    compile 'com.android.support:palette-v7:25.0.+'
     testCompile 'junit:junit:4.12'
 }

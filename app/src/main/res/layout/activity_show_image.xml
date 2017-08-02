@@ -19,33 +19,22 @@
         android:layout_alignParentTop="true"
         android:id="@+id/image_preview"
         />
-
-    <Button
-        android:id="@+id/apply_button"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:text="@string/apply_style"
-        android:layout_marginBottom="26dp"
-        android:layout_alignParentBottom="true"
-        android:layout_alignParentStart="true"
-        android:layout_marginStart="36dp" />
     <Button
         android:id="@+id/share_button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="center"
         android:text="@string/share"
-        android:layout_alignBaseline="@+id/apply_button"
-        android:layout_alignBottom="@+id/apply_button"
+        android:layout_marginEnd="13dp"
+        android:layout_alignParentTop="true"
         android:layout_alignParentEnd="true"
-        android:layout_marginEnd="55dp" />
+        android:layout_marginTop="16dp" />
 
     <android.support.v7.widget.RecyclerView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_above="@+id/apply_button"
         android:layout_alignParentStart="true"
+        android:layout_alignParentBottom="true"
         android:layout_marginBottom="16dp"
         android:id="@+id/my_rec_vw"/>
 
