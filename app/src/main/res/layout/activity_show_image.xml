@@ -3,21 +3,18 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    tools:context="in.dc297.artisticstyletransfer.ShowImageActivity">
+    tools:context="in.dc297.artisticstyletransfer.ShowImageActivity"
+    android:animateLayoutChanges="true">
 
     <ImageView
         android:id="@+id/image_orig"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_centerVertical="true"
-        android:layout_centerInParent="true"/>
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"/>
 
     <ImageView
         android:id="@+id/image_preview"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_centerVertical="true"
-        android:layout_centerInParent="true"/>
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"/>
 
     <Button
         android:id="@+id/share_button"
@@ -30,6 +27,15 @@
         android:layout_alignParentEnd="true"
         android:layout_marginTop="16dp" />
 
+    <SeekBar
+        android:id="@+id/seekBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_above="@+id/my_rec_vw"
+        android:layout_marginBottom="17dp"
+        />
+
     <android.support.v7.widget.RecyclerView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -37,20 +43,6 @@
         android:layout_alignParentBottom="true"
         android:layout_marginBottom="16dp"
         android:id="@+id/my_rec_vw"/>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:weightSum="1"
-        android:layout_above="@+id/my_rec_vw"
-        android:layout_alignParentStart="true"
-        android:layout_marginBottom="17dp">
-    <SeekBar
-        android:id="@+id/seekBar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_alignParentStart="true" />
-    </LinearLayout>
 
 
 </RelativeLayout>

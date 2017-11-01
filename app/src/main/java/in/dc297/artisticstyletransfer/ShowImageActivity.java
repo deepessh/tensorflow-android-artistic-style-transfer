@@ -25,6 +25,7 @@ import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.util.LruCache;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -35,6 +36,7 @@ import android.widget.Toast;
 
 import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
 
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -96,12 +98,14 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
         setContentView(R.layout.activity_show_image);
         mPreviewImage = (ImageView) findViewById(R.id.image_preview);
         mOriginalImage = (ImageView) findViewById(R.id.image_orig);
+
         Intent recvdIntent = getIntent();
         mImagePath = recvdIntent.getStringExtra("filepath");
         getPreview();
         Palette.from(mOrigBitmap).generate(new Palette.PaletteAsyncListener() {
             public void onGenerated(Palette p) {
                 mPreviewImage.setBackgroundColor(p.getDominantColor(Color.BLACK));
+                mOriginalImage.setBackgroundColor(p.getDominantColor(Color.BLACK));
             }
         });
         intValues = new int[mImgBitmap.getWidth() * mImgBitmap.getHeight()];
@@ -121,8 +125,8 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
                 if(mImgBitmap!=null) {
                     try{
                         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-                        mImgBitmap.compress(Bitmap.CompressFormat.JPEG, 50, bytes);
-                        Bitmap newBitmap = Bitmap.createBitmap(mImgBitmap.getWidth(), mImgBitmap.getHeight(), Bitmap.Config.ARGB_8888);
+                        mImgBitmap.compress(Bitmap.CompressFormat.PNG, 100, bytes);
+                        Bitmap newBitmap = BitmapFactory.decodeStream(new ByteArrayInputStream(bytes.toByteArray()));
                         // create a canvas where we can draw on
                         Canvas canvas = new Canvas(newBitmap);
                         // create a paint instance with alpha
@@ -213,6 +217,24 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
         });
         mOriginalImage.setImageBitmap(mOrigBitmap);
         mPreviewImage.setImageBitmap(mImgBitmap);
+
+        mPreviewImage.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if(shareButton!=null){
+                    if(shareButton.getVisibility()==View.VISIBLE) shareButton.setVisibility(View.GONE);
+                    else shareButton.setVisibility(View.VISIBLE);
+                }
+                if(mRecyclerView!=null){
+                    if(mRecyclerView.getVisibility()==View.VISIBLE) mRecyclerView.setVisibility(View.GONE);
+                    else mRecyclerView.setVisibility(View.VISIBLE);
+                }
+                if(mSeekBar!=null){
+                    if(mSeekBar.getVisibility()==View.VISIBLE) mSeekBar.setVisibility(View.GONE);
+                    else mSeekBar.setVisibility(View.VISIBLE);
+                }
+            }
+        });
     }
 
     private void loadStyleBitmaps(){
@@ -235,6 +257,7 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
         handlerThread = new HandlerThread("inference");
         handlerThread.start();
         handler = new Handler(handlerThread.getLooper());
+        if(progress!=null) progress.cancel();
         progress = new ProgressDialog(ShowImageActivity.this);
         progress.setTitle("Loading");
         progress.setMessage("Wait while loading model...");
