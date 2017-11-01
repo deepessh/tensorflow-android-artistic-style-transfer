@@ -2,7 +2,9 @@ package in.dc297.artisticstyletransfer;
 
 import android.Manifest;
 import android.app.Activity;
+import android.app.ActivityManager;
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -22,6 +24,7 @@ import android.support.v7.graphics.Palette;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
+import android.util.LruCache;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -72,6 +75,17 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
 
     private static final int REQUEST_STORAGE_PERMISSION = 1;
 
+    final int maxMemory = (int) (Runtime.getRuntime().maxMemory());
+
+    // Use 1/8th of the available memory for this memory cache.
+    final int cacheSize = maxMemory / 8;
+
+    private LruCache<String, Bitmap> bitmapCache = new LruCache<String, Bitmap>(cacheSize) {
+        protected int sizeOf(String key, Bitmap value) {
+            return value.getByteCount();
+        }
+    };
+
     private SeekBar mSeekBar;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -107,7 +121,7 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
                 if(mImgBitmap!=null) {
                     try{
                         ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-                        mImgBitmap.compress(Bitmap.CompressFormat.JPEG, 100, bytes);
+                        mImgBitmap.compress(Bitmap.CompressFormat.JPEG, 50, bytes);
                         Bitmap newBitmap = Bitmap.createBitmap(mImgBitmap.getWidth(), mImgBitmap.getHeight(), Bitmap.Config.ARGB_8888);
                         // create a canvas where we can draw on
                         Canvas canvas = new Canvas(newBitmap);
@@ -223,7 +237,7 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
         handler = new Handler(handlerThread.getLooper());
         progress = new ProgressDialog(ShowImageActivity.this);
         progress.setTitle("Loading");
-        progress.setMessage("Wait while loading...");
+        progress.setMessage("Wait while loading model...");
         progress.setCancelable(false); // disable dismiss by tapping outside of the dialog
         progress.show();
         runInBackground(new Runnable() {
@@ -286,14 +300,18 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
     }
 
     private void stylizeImage() {
-        mImgBitmap = Bitmap.createBitmap(mOrigBitmap);
-        for(int i = 0;i<NUM_STYLES;i++){
-            if(i==mSelectedStyle) {
-                styleVals[i] = 1.0f;
+        if(bitmapCache.get("style_"+String.valueOf(mSelectedStyle))==null) {
+            ActivityManager actManager = (ActivityManager) getApplication().getSystemService(Context.ACTIVITY_SERVICE);
+            ActivityManager.MemoryInfo memInfo = new ActivityManager.MemoryInfo();
+            actManager.getMemoryInfo(memInfo);
+
+            mImgBitmap = Bitmap.createBitmap(mOrigBitmap);
+            for (int i = 0; i < NUM_STYLES; i++) {
+                if (i == mSelectedStyle) {
+                    styleVals[i] = 1.0f;
+                } else styleVals[i] = 0.0f;
             }
-            else styleVals[i] = 0.0f;
-        }
-        mImgBitmap.getPixels(intValues, 0, mImgBitmap.getWidth(), 0, 0, mImgBitmap.getWidth(), mImgBitmap.getHeight());
+            mImgBitmap.getPixels(intValues, 0, mImgBitmap.getWidth(), 0, 0, mImgBitmap.getWidth(), mImgBitmap.getHeight());
 
             for (int i = 0; i < intValues.length; ++i) {
                 final int val = intValues[i];
@@ -302,28 +320,33 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
                 floatValues[i * 3 + 2] = (val & 0xFF) / 255.0f;
             }
 
-        // Copy the input data into TensorFlow.
-        inferenceInterface.feed(
-                INPUT_NODE, floatValues, 1, mImgBitmap.getHeight(), mImgBitmap.getWidth(), 3);
-        inferenceInterface.feed(STYLE_NODE, styleVals, NUM_STYLES);
-        inferenceInterface.run(new String[] {OUTPUT_NODE}, isDebug());
-        floatValues = new float[mImgBitmap.getWidth()*(mImgBitmap.getHeight()+10)*3];//add a little buffer to the float array because tensorflow sometimes returns larger images than what is given as input
-        inferenceInterface.fetch(OUTPUT_NODE, floatValues);
+            // Copy the input data into TensorFlow.
+            inferenceInterface.feed(
+                    INPUT_NODE, floatValues, 1, mImgBitmap.getHeight(), mImgBitmap.getWidth(), 3);
+            inferenceInterface.feed(STYLE_NODE, styleVals, NUM_STYLES);
+            inferenceInterface.run(new String[]{OUTPUT_NODE}, isDebug());
+            floatValues = new float[mImgBitmap.getWidth() * (mImgBitmap.getHeight() + 10) * 3];//add a little buffer to the float array because tensorflow sometimes returns larger images than what is given as input
+            inferenceInterface.fetch(OUTPUT_NODE, floatValues);
 
-        for (int i = 0; i < intValues.length; ++i) {
-            intValues[i] =
-                    0xFF000000
-                            | (((int) (floatValues[i * 3] * 255)) << 16)
-                            | (((int) (floatValues[i * 3 + 1] * 255)) << 8)
-                            | ((int) (floatValues[i * 3 + 2] * 255));
+            for (int i = 0; i < intValues.length; ++i) {
+                intValues[i] =
+                        0xFF000000
+                                | (((int) (floatValues[i * 3] * 255)) << 16)
+                                | (((int) (floatValues[i * 3 + 1] * 255)) << 8)
+                                | ((int) (floatValues[i * 3 + 2] * 255));
+            }
+            floatValues = new float[mImgBitmap.getWidth() * (mImgBitmap.getHeight()) * 3];
+            mImgBitmap.setPixels(intValues, 0, mImgBitmap.getWidth(), 0, 0, mImgBitmap.getWidth(), mImgBitmap.getHeight());
         }
-        floatValues = new float[mImgBitmap.getWidth()*(mImgBitmap.getHeight())*3];
-        mImgBitmap.setPixels(intValues, 0, mImgBitmap.getWidth(), 0, 0, mImgBitmap.getWidth(), mImgBitmap.getHeight());
+        else{
+            mImgBitmap = bitmapCache.get("style_"+String.valueOf(mSelectedStyle));
+        }
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
                 if(mPreviewImage!=null){
                     mPreviewImage.setImageBitmap(mImgBitmap);
+                    bitmapCache.put("style_"+String.valueOf(mSelectedStyle),mImgBitmap);
                     if(progress!=null){
                         progress.dismiss();
                     }

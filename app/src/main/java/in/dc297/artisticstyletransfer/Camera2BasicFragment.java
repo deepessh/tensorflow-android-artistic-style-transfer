@@ -2,9 +2,14 @@ package in.dc297.artisticstyletransfer;
 
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Rect;
+import android.hardware.Camera;
+import android.hardware.camera2.CaptureFailure;
+import android.hardware.camera2.params.MeteringRectangle;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 
@@ -84,6 +89,10 @@ public class Camera2BasicFragment extends Fragment
         ORIENTATIONS.append(Surface.ROTATION_180, 270);
         ORIENTATIONS.append(Surface.ROTATION_270, 180);
     }
+
+    private boolean mManualFocusEngaged = false;
+
+    private static  final int FOCUS_AREA_SIZE= 300;
 
     /**
      * Tag for the {@link Log}.
@@ -183,6 +192,12 @@ public class Camera2BasicFragment extends Fragment
     /**
      * {@link CameraDevice.StateCallback} is called when {@link CameraDevice} changes its state.
      */
+
+
+    private float finger_spacing = 0;
+    private int zoom_level = 1;
+
+
     private final CameraDevice.StateCallback mStateCallback = new CameraDevice.StateCallback() {
 
         @Override
@@ -443,9 +458,160 @@ public class Camera2BasicFragment extends Fragment
                 onResume();
             }
         });
+        mTextureView.setOnTouchListener(new View.OnTouchListener() {
+            @Override
+            public boolean onTouch(View view, MotionEvent motionEvent) {
+                final int actionMasked = motionEvent.getActionMasked();
+                if (actionMasked != MotionEvent.ACTION_DOWN) {
+                    return false;
+                }
+                if (mManualFocusEngaged) {
+                    Log.d(TAG, "Manual focus already engaged");
+                    return true;
+                }
+
+                CameraManager manager = (CameraManager) getActivity().getSystemService(Context.CAMERA_SERVICE);
+                CameraCharacteristics mCameraInfo = null;
+                try {
+                    mCameraInfo = manager.getCameraCharacteristics(mCameraId);
+                } catch (CameraAccessException e) {
+                    e.printStackTrace();
+                }
+
+
+
+                if (mCameraInfo != null) {
+                    float current_finger_spacing;
+                    float maxzoom = (mCameraInfo.get(CameraCharacteristics.SCALER_AVAILABLE_MAX_DIGITAL_ZOOM))*10;
+                    Rect m = mCameraInfo.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+
+                    if(motionEvent.getPointerCount()>1){
+                        current_finger_spacing = getFingerSpacing(motionEvent);
+                        if(finger_spacing != 0){
+                            if(current_finger_spacing > finger_spacing && maxzoom > zoom_level){
+                                zoom_level++;
+                            } else if (current_finger_spacing < finger_spacing && zoom_level > 1){
+                                zoom_level--;
+                            }
+                            int minW = (int) (m.width() / maxzoom);
+                            int minH = (int) (m.height() / maxzoom);
+                            int difW = m.width() - minW;
+                            int difH = m.height() - minH;
+                            int cropW = difW /100 *(int)zoom_level;
+                            int cropH = difH /100 *(int)zoom_level;
+                            cropW -= cropW & 3;
+                            cropH -= cropH & 3;
+                            Rect zoom = new Rect(cropW, cropH, m.width() - cropW, m.height() - cropH);
+                            mPreviewRequestBuilder.set(CaptureRequest.SCALER_CROP_REGION, zoom);
+                        }
+                        finger_spacing = current_finger_spacing;
+                        try {
+                            mCaptureSession.setRepeatingRequest(mPreviewRequestBuilder.build(), null, null);
+                        } catch (CameraAccessException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                    else {
+                        final Rect sensorArraySize = mCameraInfo.get(CameraCharacteristics.SENSOR_INFO_ACTIVE_ARRAY_SIZE);
+
+                        //TODO: here I just flip x,y, but this needs to correspond with the sensor orientation (via SENSOR_ORIENTATION)
+                        final int y = (int) ((motionEvent.getX() / (float) view.getWidth()) * (float) sensorArraySize.height());
+                        final int x = (int) ((motionEvent.getY() / (float) view.getHeight()) * (float) sensorArraySize.width());
+                        final int halfTouchWidth = (int) motionEvent.getTouchMajor(); //TODO: this doesn't represent actual touch size in pixel. Values range in [3, 10]...
+                        final int halfTouchHeight = (int) motionEvent.getTouchMinor();
+                        MeteringRectangle focusAreaTouch = new MeteringRectangle(Math.max(x - halfTouchWidth, 0),
+                                Math.max(y - halfTouchHeight, 0),
+                                halfTouchWidth * 2,
+                                halfTouchHeight * 2,
+                                MeteringRectangle.METERING_WEIGHT_MAX - 1);
+
+                        CameraCaptureSession.CaptureCallback captureCallbackHandler = new CameraCaptureSession.CaptureCallback() {
+                            @Override
+                            public void onCaptureCompleted(CameraCaptureSession session, CaptureRequest request, TotalCaptureResult result) {
+                                super.onCaptureCompleted(session, request, result);
+                                mManualFocusEngaged = false;
+
+                                if (request.getTag() == "FOCUS_TAG") {
+                                    //the focus trigger is complete -
+                                    //resume repeating (preview surface will get frames), clear AF trigger
+                                    mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, null);
+                                    try {
+                                        mCaptureSession.setRepeatingRequest(mPreviewRequestBuilder.build(), null, null);
+                                    } catch (CameraAccessException e) {
+                                        e.printStackTrace();
+                                    }
+                                }
+                            }
+
+                            @Override
+                            public void onCaptureFailed(CameraCaptureSession session, CaptureRequest request, CaptureFailure failure) {
+                                super.onCaptureFailed(session, request, failure);
+                                Log.e(TAG, "Manual AF failure: " + failure);
+                                mManualFocusEngaged = false;
+                            }
+                        };
+
+                        //first stop the existing repeating request
+                        try {
+                            mCaptureSession.stopRepeating();
+                        } catch (CameraAccessException e) {
+                            e.printStackTrace();
+                        }
+
+                        //cancel any existing AF trigger (repeated touches, etc.)
+                        mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_CANCEL);
+                        mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_OFF);
+                        try {
+                            mCaptureSession.capture(mPreviewRequestBuilder.build(), captureCallbackHandler, mBackgroundHandler);
+                        } catch (CameraAccessException e) {
+                            e.printStackTrace();
+                        }
+
+                        //Now add a new AF trigger with focus region
+                        if (isMeteringAreaAFSupported()) {
+                            mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_REGIONS, new MeteringRectangle[]{focusAreaTouch});
+                        }
+                        mPreviewRequestBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO);
+                        mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_AUTO);
+                        mPreviewRequestBuilder.set(CaptureRequest.CONTROL_AF_TRIGGER, CameraMetadata.CONTROL_AF_TRIGGER_START);
+                        mPreviewRequestBuilder.setTag("FOCUS_TAG"); //we'll capture this later for resuming the preview
+
+                        //then we ask for a single request (not repeating!)
+                        try {
+                            mCaptureSession.capture(mPreviewRequestBuilder.build(), captureCallbackHandler, mBackgroundHandler);
+                        } catch (CameraAccessException e) {
+                            e.printStackTrace();
+                        }
+                        mManualFocusEngaged = true;
+                    }
+
+                }
+                return true;
+            }
+        });
     }
 
-    @Override
+    //Determine the space between the first two fingers
+    private float getFingerSpacing(MotionEvent event) {
+        float x = event.getX(0) - event.getX(1);
+        float y = event.getY(0) - event.getY(1);
+        return (float) Math.sqrt(x * x + y * y);
+    }
+
+    private boolean isMeteringAreaAFSupported() {
+        CameraManager manager = (CameraManager) getActivity().getSystemService(Context.CAMERA_SERVICE);
+        CameraCharacteristics mCameraInfo = null;
+        try {
+            mCameraInfo = manager.getCameraCharacteristics(mCameraId);
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
+
+        if (mCameraInfo != null) {
+            return mCameraInfo.get(CameraCharacteristics.CONTROL_MAX_REGIONS_AF) >= 1;
+        }
+        return false;
+    }
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
         mFile = new File(getActivity().getExternalFilesDir(null), "pic.jpg");
@@ -461,7 +627,7 @@ public class Camera2BasicFragment extends Fragment
         // a camera and start preview from here (otherwise, we wait until the surface is ready in
         // the SurfaceTextureListener).
         if (mTextureView.isAvailable()) {
-            openCamera(mTextureView.getWidth(), mTextureView.getHeight());
+             openCamera(mTextureView.getWidth(), mTextureView.getHeight());
         } else {
             mTextureView.setSurfaceTextureListener(mSurfaceTextureListener);
         }
@@ -511,7 +677,6 @@ public class Camera2BasicFragment extends Fragment
                 CameraCharacteristics characteristics
                         = manager.getCameraCharacteristics(cameraId);
 
-                // We don't use a front facing camera in this sample.
                 Integer facing = characteristics.get(CameraCharacteristics.LENS_FACING);
                 if (facing != null && facing == CameraCharacteristics.LENS_FACING_FRONT && !mFront) {
                     continue;
@@ -532,22 +697,30 @@ public class Camera2BasicFragment extends Fragment
                 }*/
                 // For still image captures, we use the largest available size.
                 List<Size> camSupportedSize = Arrays.asList(map.getOutputSizes(ImageFormat.JPEG));
-                Log.d(TAG,camSupportedSize.toString());
+
                 List<Size> matchingSize = new ArrayList<Size>();
                 Iterator iterator = camSupportedSize.iterator();
+                List<Size> exactMatch = new ArrayList<>();
                 while (iterator.hasNext()) {
                     Size thisSize = (Size) iterator.next();
-                    Log.d(TAG,String.valueOf(thisSize.getWidth()*1.0d/thisSize.getHeight()*1.0d));
-                    Log.d(TAG,String.valueOf(width*1.0d/height*1.0d));
                     if((thisSize.getWidth()*1.0d/thisSize.getHeight()*1.0d==width*1.0d/height*1.0d) || (thisSize.getWidth()*1.0d/thisSize.getHeight()*1.0d==height*1.0d/width*1.0d)){
                         matchingSize.add(thisSize);
                     }
+                    if((thisSize.getWidth()==width && thisSize.getHeight()==height)||(thisSize.getWidth()==height && thisSize.getHeight()==width)){
+                        exactMatch.add(thisSize);
+                    }
                 }
-                Log.d(TAG,matchingSize.toString());
-                Size largest = Collections.max(
-                        (matchingSize.size()>0?matchingSize:camSupportedSize),
-                        new CompareSizesByArea());
-                Log.d(TAG,largest.toString());
+                Size largest = null;
+                Log.i(Camera2BasicFragment.class.getName(),exactMatch!=null?exactMatch.toString():"exact match empty");
+                if(exactMatch!=null && exactMatch.size()>0){
+                    largest = Collections.max(exactMatch,new CompareSizesByArea());
+                }
+                else{
+                    largest = Collections.max(
+                            (matchingSize.size()>0?matchingSize:camSupportedSize),
+                            new CompareSizesByArea());
+                }
+
                 mImageReader = ImageReader.newInstance(largest.getWidth(), largest.getHeight(),
                         ImageFormat.JPEG, /*maxImages*/2);
                 mImageReader.setOnImageAvailableListener(
@@ -626,6 +799,7 @@ public class Camera2BasicFragment extends Fragment
         } catch (NullPointerException e) {
             // Currently an NPE is thrown when the Camera2API is used but not supported on the
             // device this code runs.
+            e.printStackTrace();
             ErrorDialog.newInstance(getString(R.string.camera_error))
                     .show(getChildFragmentManager(), FRAGMENT_DIALOG);
         }
@@ -645,7 +819,7 @@ public class Camera2BasicFragment extends Fragment
         Activity activity = getActivity();
         CameraManager manager = (CameraManager) activity.getSystemService(Context.CAMERA_SERVICE);
         try {
-            if (!mCameraOpenCloseLock.tryAcquire(2500, TimeUnit.MILLISECONDS)) {
+            if (!mCameraOpenCloseLock.tryAcquire(5000, TimeUnit.MILLISECONDS)) {
                 throw new RuntimeException("Time out waiting to lock camera opening.");
             }
             manager.openCamera(mCameraId, mStateCallback, mBackgroundHandler);
@@ -653,6 +827,10 @@ public class Camera2BasicFragment extends Fragment
             e.printStackTrace();
         } catch (InterruptedException e) {
             throw new RuntimeException("Interrupted while trying to lock camera opening.", e);
+        }
+        catch(RuntimeException e){
+            e.printStackTrace();
+            Toast.makeText(getActivity(), "Timed out while waiting for camera! Please relaunch app.",Toast.LENGTH_SHORT).show();
         }
     }
 
