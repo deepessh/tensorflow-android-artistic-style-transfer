@@ -12,6 +12,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -25,19 +26,18 @@ import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.util.LruCache;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
-import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.RelativeLayout;
 import android.widget.SeekBar;
 import android.widget.Toast;
 
+import com.mikepenz.iconics.context.IconicsContextWrapper;
+
 import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 
@@ -66,7 +66,7 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
     private ProgressDialog progress =null;
     private Handler handler;
     private HandlerThread handlerThread;
-    private Button shareButton;
+    private ImageView shareButton;
 
     private RecyclerView mRecyclerView;
     private HorizontalListAdapter mHrAdapter;
@@ -93,9 +93,9 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN,
-                WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        getWindow().setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
         setContentView(R.layout.activity_show_image);
+
         mPreviewImage = (ImageView) findViewById(R.id.image_preview);
         mOriginalImage = (ImageView) findViewById(R.id.image_orig);
 
@@ -111,7 +111,7 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
         intValues = new int[mImgBitmap.getWidth() * mImgBitmap.getHeight()];
         floatValues = new float[mImgBitmap.getWidth() * mImgBitmap.getHeight() * 3];
 
-        shareButton = (Button) findViewById(R.id.share_button);
+        shareButton = findViewById(R.id.share_button);
 
         shareButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -124,9 +124,7 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
                 }
                 if(mImgBitmap!=null) {
                     try{
-                        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-                        mImgBitmap.compress(Bitmap.CompressFormat.PNG, 100, bytes);
-                        Bitmap newBitmap = BitmapFactory.decodeStream(new ByteArrayInputStream(bytes.toByteArray()));
+                        Bitmap newBitmap = Bitmap.createBitmap(mImgBitmap.getWidth(), mImgBitmap.getHeight(), Bitmap.Config.ARGB_8888);
                         // create a canvas where we can draw on
                         Canvas canvas = new Canvas(newBitmap);
                         // create a paint instance with alpha
@@ -183,7 +181,7 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
                                     runOnUiThread(new Runnable() {
                                         @Override
                                         public void run() {
-                                            Toast.makeText(getApplicationContext(),"Oops! Seems like your phone can't handle the pressure :P",Toast.LENGTH_SHORT).show();
+                                            Toast.makeText(getApplicationContext(),"Oops! Some error occurred!",Toast.LENGTH_SHORT).show();
                                             if(progress!=null){
                                                 progress.dismiss();
                                             }
@@ -218,12 +216,28 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
         mOriginalImage.setImageBitmap(mOrigBitmap);
         mPreviewImage.setImageBitmap(mImgBitmap);
 
+        ImageView backButton = findViewById(R.id.backButton);
+        backButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                finish();
+            }
+        });
+
+        int statusBarHeight = getStatusBarHeight();
+
+        final RelativeLayout relativeLayout= findViewById(R.id.relativeLayout);
+        RelativeLayout.LayoutParams relativeLayoutLayoutParams = (RelativeLayout.LayoutParams) relativeLayout.getLayoutParams();
+        Log.i(ShowImageActivity.class.getName(),String.valueOf(statusBarHeight));
+        relativeLayoutLayoutParams.setMargins(0,statusBarHeight,0,0);
+        relativeLayout.setLayoutParams(relativeLayoutLayoutParams);
+
         mPreviewImage.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                if(shareButton!=null){
-                    if(shareButton.getVisibility()==View.VISIBLE) shareButton.setVisibility(View.GONE);
-                    else shareButton.setVisibility(View.VISIBLE);
+                if(relativeLayout!=null){
+                    if(relativeLayout.getVisibility()==View.VISIBLE) relativeLayout.setVisibility(View.GONE);
+                    else relativeLayout.setVisibility(View.VISIBLE);
                 }
                 if(mRecyclerView!=null){
                     if(mRecyclerView.getVisibility()==View.VISIBLE) mRecyclerView.setVisibility(View.GONE);
@@ -235,6 +249,15 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
                 }
             }
         });
+    }
+
+    public int getStatusBarHeight() {
+        int result = 0;
+        int resourceId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (resourceId > 0) {
+            result = getResources().getDimensionPixelSize(resourceId);
+        }
+        return result;
     }
 
     private void loadStyleBitmaps(){
@@ -405,5 +428,10 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
             shareButton.performClick();
             super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         }
+    }
+
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(IconicsContextWrapper.wrap(newBase));
     }
 }
