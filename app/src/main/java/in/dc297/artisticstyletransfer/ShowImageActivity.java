@@ -101,15 +101,31 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
 
         Intent recvdIntent = getIntent();
         mImagePath = recvdIntent.getStringExtra("filepath");
-        getPreview();
-        Palette.from(mOrigBitmap).generate(new Palette.PaletteAsyncListener() {
-            public void onGenerated(Palette p) {
-                mPreviewImage.setBackgroundColor(p.getDominantColor(Color.BLACK));
-                mOriginalImage.setBackgroundColor(p.getDominantColor(Color.BLACK));
+        handlerThread = new HandlerThread("inference");
+        handlerThread.start();
+        handler = new Handler(handlerThread.getLooper());
+
+        runInBackground(new Runnable() {
+            @Override
+            public void run() {
+                getPreview();
+                intValues = new int[mImgBitmap.getWidth() * mImgBitmap.getHeight()];
+                floatValues = new float[mImgBitmap.getWidth() * mImgBitmap.getHeight() * 3];
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        Palette.from(mOrigBitmap).generate(new Palette.PaletteAsyncListener() {
+                            public void onGenerated(Palette p) {
+                                mPreviewImage.setBackgroundColor(p.getDominantColor(Color.BLACK));
+                                mOriginalImage.setBackgroundColor(p.getDominantColor(Color.BLACK));
+                            }
+                        });
+                        mOriginalImage.setImageBitmap(mOrigBitmap);
+                        mPreviewImage.setImageBitmap(mImgBitmap);
+                    }
+                });
             }
         });
-        intValues = new int[mImgBitmap.getWidth() * mImgBitmap.getHeight()];
-        floatValues = new float[mImgBitmap.getWidth() * mImgBitmap.getHeight() * 3];
 
         shareButton = findViewById(R.id.share_button);
 
@@ -166,7 +182,7 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
                 mSelectedStyle = position;
                 progress = new ProgressDialog(ShowImageActivity.this);
                 progress.setTitle("Loading");
-                progress.setMessage("Wait while loading...");
+                progress.setMessage("Applying your awesone style! Please wait!");
                 progress.setCancelable(false); // disable dismiss by tapping outside of the dialog
                 progress.show();
                 runInBackground(
@@ -213,8 +229,6 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
             public void onStopTrackingTouch(SeekBar seekBar) {
             }
         });
-        mOriginalImage.setImageBitmap(mOrigBitmap);
-        mPreviewImage.setImageBitmap(mImgBitmap);
 
         ImageView backButton = findViewById(R.id.backButton);
         backButton.setOnClickListener(new View.OnClickListener() {
@@ -276,10 +290,6 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
     @Override
     public synchronized void onResume(){
         super.onResume();
-
-        handlerThread = new HandlerThread("inference");
-        handlerThread.start();
-        handler = new Handler(handlerThread.getLooper());
         if(progress!=null) progress.cancel();
         progress = new ProgressDialog(ShowImageActivity.this);
         progress.setTitle("Loading");

@@ -768,6 +768,8 @@ public class Camera2BasicFragment extends Fragment
                             mPreviewSize.getHeight(), mPreviewSize.getWidth());
                 }
 
+                Log.i(TAG,"Chosen Size: "+ mPreviewSize.toString());
+
                 // Check if the flash is supported.
                 Boolean available = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE);
                 mFlashSupported = available == null ? false : available;
@@ -1040,7 +1042,7 @@ public class Camera2BasicFragment extends Fragment
             };
 
             mCaptureSession.stopRepeating();
-            mCaptureSession.capture(captureBuilder.build(), CaptureCallback, null);
+            mCaptureSession.capture(captureBuilder.build(), CaptureCallback, mBackgroundHandler);
         } catch (CameraAccessException e) {
             e.printStackTrace();
         }
