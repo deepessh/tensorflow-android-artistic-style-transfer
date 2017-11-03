@@ -1,5 +1,5 @@
 project.ext.ASSET_DIR = projectDir.toString() + '/assets'
-project.ext.TMP_DIR   = project.buildDir.toString() + '/downloads'
+project.ext.TMP_DIR = project.buildDir.toString() + '/downloads'
 
 apply plugin: 'com.android.application'
 
@@ -34,6 +34,8 @@ dependencies {
     compile 'org.tensorflow:tensorflow-android:+'
     compile 'com.android.support:recyclerview-v7:26.1.0'
     compile 'com.android.support:palette-v7:26.1.0'
+
+    compile 'com.wonderkiln:camerakit:0.11.2'
 
     implementation "com.mikepenz:iconics-core:2.9.5@aar"
     implementation "com.android.support:appcompat-v7:26.1.0"

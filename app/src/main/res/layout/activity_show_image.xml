@@ -16,6 +16,18 @@
         android:id="@+id/image_preview"
         android:layout_width="match_parent"
         android:layout_height="match_parent"/>
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/colorPrimaryTransparent"
+        android:id="@+id/statusBarBg"/>
+
+    <ImageView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:background="#000000"
+        android:id="@+id/navigartionBarBg"/>
 
     <RelativeLayout
         android:layout_width="match_parent"
@@ -29,6 +41,8 @@
             android:layout_alignParentTop="true"
             android:layout_alignParentStart="true"
             android:padding="5dp"
+            app:ico_contour_color="#000000"
+            app:ico_contour_width="0.3dp"
             app:ico_color="@color/colorIcon"
             app:ico_icon="gmd-arrow-back"
             app:ico_size="18dp"
@@ -42,7 +56,10 @@
             android:padding="5dp"
             app:ico_color="@color/colorIcon"
             app:ico_icon="gmd-share"
-            app:ico_size="18dp"/>
+            app:ico_contour_color="#000000"
+            app:ico_contour_width="0.3dp"
+            app:ico_size="18dp"
+            />
     </RelativeLayout>
 
     <SeekBar

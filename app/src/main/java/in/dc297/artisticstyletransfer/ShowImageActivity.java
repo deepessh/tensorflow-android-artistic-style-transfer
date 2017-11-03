@@ -93,7 +93,8 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         requestWindowFeature(Window.FEATURE_NO_TITLE);
-        getWindow().setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
+        Window window = getWindow();
+        window.setFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS, WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
         setContentView(R.layout.activity_show_image);
 
         mPreviewImage = (ImageView) findViewById(R.id.image_preview);
@@ -234,11 +235,19 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
         backButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
-                finish();
+                onNavigateUp();
             }
         });
 
         int statusBarHeight = getStatusBarHeight();
+        ImageView statusBarBg = findViewById(R.id.statusBarBg);
+        statusBarBg.getLayoutParams().height = statusBarHeight;
+        statusBarBg.requestLayout();
+
+        int navigationBarHeight = getNavigationBarHeight();
+        ImageView navigationBarBg = findViewById(R.id.navigartionBarBg);
+        navigationBarBg.getLayoutParams().height = navigationBarHeight;
+        navigationBarBg.requestLayout();
 
         final RelativeLayout relativeLayout= findViewById(R.id.relativeLayout);
         RelativeLayout.LayoutParams relativeLayoutLayoutParams = (RelativeLayout.LayoutParams) relativeLayout.getLayoutParams();
@@ -263,11 +272,23 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
                 }
             }
         });
+        RelativeLayout.LayoutParams recyclerLayoutParams = (RelativeLayout.LayoutParams)mRecyclerView.getLayoutParams();
+        recyclerLayoutParams.setMargins(0,0,0,navigationBarHeight);
+        mRecyclerView.setLayoutParams(recyclerLayoutParams);
     }
 
     public int getStatusBarHeight() {
         int result = 0;
         int resourceId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        if (resourceId > 0) {
+            result = getResources().getDimensionPixelSize(resourceId);
+        }
+        return result;
+    }
+
+    public int getNavigationBarHeight(){
+        int result = 0;
+        int resourceId = getResources().getIdentifier("navigation_bar_height", "dimen", "android");
         if (resourceId > 0) {
             result = getResources().getDimensionPixelSize(resourceId);
         }
@@ -290,24 +311,26 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
     @Override
     public synchronized void onResume(){
         super.onResume();
-        if(progress!=null) progress.cancel();
-        progress = new ProgressDialog(ShowImageActivity.this);
-        progress.setTitle("Loading");
-        progress.setMessage("Wait while loading model...");
-        progress.setCancelable(false); // disable dismiss by tapping outside of the dialog
-        progress.show();
-        runInBackground(new Runnable() {
-            @Override
-            public void run() {
-                inferenceInterface = new TensorFlowInferenceInterface(getAssets(), MODEL_FILE);
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        progress.cancel();
-                    }
-                });
-            }
-        });
+        if(inferenceInterface==null) {
+            if (progress != null) progress.cancel();
+            progress = new ProgressDialog(ShowImageActivity.this);
+            progress.setTitle("Loading");
+            progress.setMessage("Wait while loading model...");
+            progress.setCancelable(false); // disable dismiss by tapping outside of the dialog
+            progress.show();
+            runInBackground(new Runnable() {
+                @Override
+                public void run() {
+                    inferenceInterface = new TensorFlowInferenceInterface(getAssets(), MODEL_FILE);
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            progress.cancel();
+                        }
+                    });
+                }
+            });
+        }
         //mOriginalImage.setImageBitmap((getPreview()));
         //mPreviewImage.setImageBitmap(getPreview());
     }

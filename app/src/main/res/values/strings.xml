@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Artistic Style Transfer</string>
+    <string name="app_name">StyleTransfer</string>
 
     <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
@@ -14,4 +14,5 @@
     <string name="share">Share</string>
     <string name="pickfromgallery">Pick From Gallery</string>
     <string name="front_cam">Toggle Front Camera</string>
+    <string name="request_permission_storage_capture">Storage permission required to capture images.</string>
 </resources>
