@@ -47,7 +47,7 @@ public class CameraActivity extends AppCompatActivity{
 
         //mCameraView.setFocus(CameraKit.Constants.FOCUS_CONTINUOUS);
 
-        mCameraView.setMethod(CameraKit.Constants.METHOD_STANDARD);
+        mCameraView.setMethod(CameraKit.Constants.METHOD_SPEED);
 
         mCameraView.setCropOutput(true);
 
@@ -84,8 +84,15 @@ public class CameraActivity extends AppCompatActivity{
                     public void callback(CameraKitImage cameraKitImage) {
                         byte[] jpeg = cameraKitImage.getJpeg();
 
+                        // Get the dimensions of the bitmap
+                        BitmapFactory.Options bmOptions = new BitmapFactory.Options();
+
+                        // Decode the image file into a Bitmap sized to fill the View
+                        //bmOptions.inJustDecodeBounds = false;
+                        bmOptions.inMutable = true;
+
                         long callbackTime = System.currentTimeMillis();
-                        Bitmap bitmap = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length);
+                        Bitmap bitmap = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length, bmOptions);
                         ResultHolder.dispose();
                         ResultHolder.setImage(bitmap);
                         ResultHolder.setNativeCaptureSize(mCameraView.getCaptureSize());

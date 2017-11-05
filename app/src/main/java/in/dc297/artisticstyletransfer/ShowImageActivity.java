@@ -313,13 +313,6 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
     }
     private Bitmap getPreview() {
 
-        // Get the dimensions of the bitmap
-        BitmapFactory.Options bmOptions = new BitmapFactory.Options();
-
-        // Decode the image file into a Bitmap sized to fill the View
-        //bmOptions.inJustDecodeBounds = false;
-        bmOptions.inMutable = true;
-
         mImgBitmap = ResultHolder.getImage();
         if(mImgBitmap==null){
             Toast.makeText(getApplicationContext(),"Some error occurred!",Toast.LENGTH_SHORT).show();

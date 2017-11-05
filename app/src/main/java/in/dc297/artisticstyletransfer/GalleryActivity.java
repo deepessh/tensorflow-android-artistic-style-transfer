@@ -44,7 +44,14 @@ public class GalleryActivity extends AppCompatActivity {
                 byte[] buffer = new byte[inputStream.available()];
                 inputStream.read(buffer);
 
-                Bitmap bitmap = BitmapFactory.decodeByteArray(buffer, 0, buffer.length);
+                // Get the dimensions of the bitmap
+                BitmapFactory.Options bmOptions = new BitmapFactory.Options();
+
+                // Decode the image file into a Bitmap sized to fill the View
+                //bmOptions.inJustDecodeBounds = false;
+                bmOptions.inMutable = true;
+
+                Bitmap bitmap = BitmapFactory.decodeByteArray(buffer, 0, buffer.length, bmOptions);
                 ResultHolder.dispose();
                 ResultHolder.setImage(bitmap);
                 Intent intent = new Intent(getApplicationContext(), ShowImageActivity.class);
