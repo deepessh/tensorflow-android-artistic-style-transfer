@@ -1,40 +1,40 @@
 package in.dc297.artisticstyletransfer;
 
-import android.Manifest;
 import android.content.Context;
 import android.content.Intent;
-import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.os.AsyncTask;
-import android.os.Environment;
-import android.support.annotation.NonNull;
-import android.support.v4.app.ActivityCompat;
-import android.support.v4.content.ContextCompat;
+import android.graphics.Point;
+import android.graphics.drawable.Drawable;
+import android.os.Build;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
-import android.util.Log;
+import android.view.Display;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.ImageView;
 import android.widget.RelativeLayout;
-import android.widget.Toast;
 
+import com.mikepenz.google_material_typeface_library.GoogleMaterial;
+import com.mikepenz.iconics.IconicsDrawable;
 import com.mikepenz.iconics.context.IconicsContextWrapper;
 import com.wonderkiln.camerakit.CameraKit;
-import com.wonderkiln.camerakit.CameraListener;
+import com.wonderkiln.camerakit.CameraKitEventCallback;
+import com.wonderkiln.camerakit.CameraKitImage;
 import com.wonderkiln.camerakit.CameraView;
 
-import java.io.File;
-import java.io.FileOutputStream;
+import java.lang.reflect.InvocationTargetException;
 
-public class CameraActivity extends AppCompatActivity implements ActivityCompat.OnRequestPermissionsResultCallback{
+public class CameraActivity extends AppCompatActivity{
 
     CameraView mCameraView;
 
-    private static final int REQUEST_STORAGE_PERMISSION = 1;
+    private static final int FLASH_MODES = 3;
+
+    private static final Drawable[] flashDrawables = new Drawable[3];
+
+    private long captureStartTime = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -45,9 +45,9 @@ public class CameraActivity extends AppCompatActivity implements ActivityCompat.
 
         mCameraView = findViewById(R.id.camera);
 
-        mCameraView.setFocus(CameraKit.Constants.FOCUS_CONTINUOUS);
+        //mCameraView.setFocus(CameraKit.Constants.FOCUS_CONTINUOUS);
 
-        mCameraView.setMethod(CameraKit.Constants.METHOD_STILL);
+        mCameraView.setMethod(CameraKit.Constants.METHOD_STANDARD);
 
         mCameraView.setCropOutput(true);
 
@@ -55,20 +55,45 @@ public class CameraActivity extends AppCompatActivity implements ActivityCompat.
 
         mCameraView.setJpegQuality(70);
 
-        mCameraView.setCameraListener(new CameraListener() {
-            @Override
-            public void onPictureTaken(byte[] picture) {
-                super.onPictureTaken(picture);
-                SavePhotoTask savePhotoTask = new SavePhotoTask();
-                savePhotoTask.execute(picture);
 
-            }
-        });
+        flashDrawables[0] = new IconicsDrawable(this)
+                .icon(GoogleMaterial.Icon.gmd_flash_off)
+                .color(getResources().getColor(R.color.colorIcon))
+                .sizeDp(20)
+                .contourColor(getResources().getColor(android.R.color.black))
+                .contourWidthPx(1);
+        flashDrawables[1] = new IconicsDrawable(this)
+                .icon(GoogleMaterial.Icon.gmd_flash_on)
+                .color(getResources().getColor(R.color.colorIcon))
+                .sizeDp(20)
+                .contourColor(getResources().getColor(android.R.color.black))
+                .contourWidthPx(1);
+        flashDrawables[2] = new IconicsDrawable(this)
+                .icon(GoogleMaterial.Icon.gmd_flash_auto)
+                .color(getResources().getColor(R.color.colorIcon))
+                .sizeDp(20)
+                .contourColor(getResources().getColor(android.R.color.black))
+                .contourWidthPx(1);
 
         findViewById(R.id.picture).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                mCameraView.captureImage();
+                captureStartTime = System.currentTimeMillis();
+                mCameraView.captureImage(new CameraKitEventCallback<CameraKitImage>() {
+                    @Override
+                    public void callback(CameraKitImage cameraKitImage) {
+                        byte[] jpeg = cameraKitImage.getJpeg();
+
+                        long callbackTime = System.currentTimeMillis();
+                        Bitmap bitmap = BitmapFactory.decodeByteArray(jpeg, 0, jpeg.length);
+                        ResultHolder.dispose();
+                        ResultHolder.setImage(bitmap);
+                        ResultHolder.setNativeCaptureSize(mCameraView.getCaptureSize());
+                        ResultHolder.setTimeToCallback(callbackTime - captureStartTime);
+                        Intent intent = new Intent(getApplicationContext(), ShowImageActivity.class);
+                        startActivity(intent);
+                    }
+                });
             }
         });
 
@@ -87,17 +112,23 @@ public class CameraActivity extends AppCompatActivity implements ActivityCompat.
             }
         });
 
-        int navigationBarHeight = getNavigationBarHeight();
+        Point statusBarSize = getNavigationBarSize(getApplicationContext());
+
+        int navigationBarHeight = statusBarSize!=null?statusBarSize.y:0;
         RelativeLayout relativeLayout = findViewById(R.id.camera_controls);
         RelativeLayout.LayoutParams layoutParams = (RelativeLayout.LayoutParams) relativeLayout.getLayoutParams();
         layoutParams.setMargins(0,0,0,navigationBarHeight);
         relativeLayout.setLayoutParams(layoutParams);
 
-        int statusBarHeight = getStatusBarHeight();
+        int statusBarHeight = getStatusBarHeight(getApplicationContext());
+
+
+        ImageView statusBarBg = findViewById(R.id.statusBarBg);
+        statusBarBg.getLayoutParams().height = statusBarHeight;
+        statusBarBg.requestLayout();
 
         final RelativeLayout relativeLayout1= findViewById(R.id.topControls);
-        RelativeLayout.LayoutParams relativeLayoutLayoutParams = (RelativeLayout.LayoutParams) relativeLayout.getLayoutParams();
-        Log.i(ShowImageActivity.class.getName(),String.valueOf(statusBarHeight));
+        RelativeLayout.LayoutParams relativeLayoutLayoutParams = (RelativeLayout.LayoutParams) relativeLayout1.getLayoutParams();
         relativeLayoutLayoutParams.setMargins(0,statusBarHeight,0,0);
         relativeLayout1.setLayoutParams(relativeLayoutLayoutParams);
 
@@ -105,135 +136,84 @@ public class CameraActivity extends AppCompatActivity implements ActivityCompat.
         navigationBar.getLayoutParams().height = navigationBarHeight;
         navigationBar.requestLayout();
 
-        if(ContextCompat.checkSelfPermission(CameraActivity.this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                != PackageManager.PERMISSION_GRANTED)
-        {
-            requestStoragePermission();
-            return;
-        }
+        final ImageView toggleFlash = findViewById(R.id.toggleFlash);
 
-        File dir = new File(Environment.getExternalStorageDirectory(), getResources().getString(R.string.app_name));
-
-        try{
-            if(!dir.exists()) {
-                if (dir.mkdir()) {
-                    System.out.println("Directory created");
-                } else {
-                    System.out.println("Directory is not created");
-                    Toast.makeText(getApplicationContext(), "Failed to create directory", Toast.LENGTH_SHORT).show();
-                }
+        toggleFlash.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                mCameraView.setFlash((mCameraView.getFlash()+1)%FLASH_MODES);
+                toggleFlash.setImageDrawable(flashDrawables[mCameraView.getFlash()]);
             }
-        }catch(Exception e){
-            e.printStackTrace();
-            Toast.makeText(getApplicationContext(),"Failed to create directory",Toast.LENGTH_SHORT).show();
-        }
+        });
 
     }
 
-    public int getStatusBarHeight() {
+    public static int getStatusBarHeight(Context context) {
         int result = 0;
-        int resourceId = getResources().getIdentifier("status_bar_height", "dimen", "android");
+        int resourceId = context.getResources().getIdentifier("status_bar_height", "dimen", "android");
         if (resourceId > 0) {
-            result = getResources().getDimensionPixelSize(resourceId);
+            result = context.getResources().getDimensionPixelSize(resourceId);
         }
         return result;
     }
 
-    public int getNavigationBarHeight(){
-        int result = 0;
-        int resourceId = getResources().getIdentifier("navigation_bar_height", "dimen", "android");
-        if (resourceId > 0) {
-            result = getResources().getDimensionPixelSize(resourceId);
+    public static Point getNavigationBarSize(Context context) {
+        Point appUsableSize = getAppUsableScreenSize(context);
+        Point realScreenSize = getRealScreenSize(context);
+
+        // navigation bar on the right
+        if (appUsableSize.x < realScreenSize.x) {
+            return new Point(realScreenSize.x - appUsableSize.x, appUsableSize.y);
         }
-        return result;
+
+        // navigation bar at the bottom
+        if (appUsableSize.y < realScreenSize.y) {
+            return new Point(appUsableSize.x, realScreenSize.y - appUsableSize.y);
+        }
+
+        // navigation bar is not present
+        return new Point();
     }
 
-    private void requestStoragePermission() {
-        if (ActivityCompat.shouldShowRequestPermissionRationale(CameraActivity.this, Manifest.permission.WRITE_EXTERNAL_STORAGE)) {
-            Toast.makeText(CameraActivity.this,"Write permission required to share",Toast.LENGTH_SHORT).show();
-        }
-        ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.WRITE_EXTERNAL_STORAGE},
-                REQUEST_STORAGE_PERMISSION);
+    public static Point getAppUsableScreenSize(Context context) {
+        WindowManager windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+        Display display = windowManager.getDefaultDisplay();
+        Point size = new Point();
+        display.getSize(size);
+        return size;
     }
 
-    @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
-                                           @NonNull int[] grantResults) {
-        if (requestCode == REQUEST_STORAGE_PERMISSION) {
-            if (grantResults.length != 1 || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
-                Camera2BasicFragment.ErrorDialog.newInstance(getString(R.string.request_permission_storage_capture)).show(getFragmentManager(),"dialog");
-            }
-            else{
-                File dir = new File(Environment.getExternalStorageDirectory(), getResources().getString(R.string.app_name));
-                try{
-                    if(!dir.exists()) {
-                        if (dir.mkdir()) {
-                            System.out.println("Directory created");
-                        } else {
-                            System.out.println("Directory is not created");
-                            Toast.makeText(getApplicationContext(), "Failed to create directory", Toast.LENGTH_SHORT).show();
-                        }
-                    }
-                    mCameraView.start();
-                }catch(Exception e){
-                    e.printStackTrace();
-                    Toast.makeText(getApplicationContext(),"Failed to create directory",Toast.LENGTH_SHORT).show();
-                }
-            }
-        } else {
-            super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+    public static Point getRealScreenSize(Context context) {
+        WindowManager windowManager = (WindowManager) context.getSystemService(Context.WINDOW_SERVICE);
+        Display display = windowManager.getDefaultDisplay();
+        Point size = new Point();
+
+        if (Build.VERSION.SDK_INT >= 17) {
+            display.getRealSize(size);
+        } else if (Build.VERSION.SDK_INT >= 14) {
+            try {
+                size.x = (Integer) Display.class.getMethod("getRawWidth").invoke(display);
+                size.y = (Integer) Display.class.getMethod("getRawHeight").invoke(display);
+            } catch (IllegalAccessException e) {} catch (InvocationTargetException e) {} catch (NoSuchMethodException e) {}
         }
+
+        return size;
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        if(ContextCompat.checkSelfPermission(CameraActivity.this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                != PackageManager.PERMISSION_GRANTED)
-        {
-            return;
-        }
         mCameraView.start();
     }
 
     @Override
     protected void onPause() {
-        if(mCameraView.isStarted()) mCameraView.stop();
+        mCameraView.stop();
         super.onPause();
     }
 
     @Override
     protected void attachBaseContext(Context newBase) {
         super.attachBaseContext(IconicsContextWrapper.wrap(newBase));
-    }
-
-    class SavePhotoTask extends AsyncTask<byte[], Integer, File> {
-        @Override
-        protected File doInBackground(byte[]... jpeg) {
-
-            File photo=new File(Environment.getExternalStorageDirectory(), getResources().getString(R.string.app_name)+"/"+System.currentTimeMillis()+".jpg");
-
-            if (photo.exists()) {
-                photo.delete();
-            }
-
-            try {
-                FileOutputStream fos=new FileOutputStream(photo.getPath());
-
-                fos.write(jpeg[0]);
-                fos.close();
-            }
-            catch (java.io.IOException e) {
-                Log.e("PictureDemo", "Exception in photoCallback", e);
-            }
-
-            return photo;
-        }
-
-        protected void onPostExecute(File result) {
-            Intent mIntent = new Intent(getApplicationContext(),ShowImageActivity.class);
-            mIntent.putExtra("filepath",result.toString());
-            startActivity(mIntent);
-        }
     }
 }

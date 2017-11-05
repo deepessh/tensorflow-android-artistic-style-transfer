@@ -12,6 +12,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Point;
 import android.graphics.Rect;
 import android.net.Uri;
 import android.os.Handler;
@@ -41,6 +42,9 @@ import org.tensorflow.contrib.android.TensorFlowInferenceInterface;
 import java.io.IOException;
 import java.util.ArrayList;
 
+import static in.dc297.artisticstyletransfer.CameraActivity.getNavigationBarSize;
+import static in.dc297.artisticstyletransfer.CameraActivity.getStatusBarHeight;
+
 public class ShowImageActivity extends Activity implements ActivityCompat.OnRequestPermissionsResultCallback{
 
     private boolean debug = false;
@@ -59,7 +63,6 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
     private TensorFlowInferenceInterface inferenceInterface;
     private ImageView mPreviewImage = null;
     private ImageView mOriginalImage = null;
-    private String mImagePath = "";
     private Bitmap mImgBitmap = null;
     private Bitmap mOrigBitmap = null;
 
@@ -100,33 +103,20 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
         mPreviewImage = (ImageView) findViewById(R.id.image_preview);
         mOriginalImage = (ImageView) findViewById(R.id.image_orig);
 
-        Intent recvdIntent = getIntent();
-        mImagePath = recvdIntent.getStringExtra("filepath");
-        handlerThread = new HandlerThread("inference");
-        handlerThread.start();
-        handler = new Handler(handlerThread.getLooper());
+        getPreview();
 
-        runInBackground(new Runnable() {
-            @Override
-            public void run() {
-                getPreview();
-                intValues = new int[mImgBitmap.getWidth() * mImgBitmap.getHeight()];
-                floatValues = new float[mImgBitmap.getWidth() * mImgBitmap.getHeight() * 3];
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        Palette.from(mOrigBitmap).generate(new Palette.PaletteAsyncListener() {
-                            public void onGenerated(Palette p) {
-                                mPreviewImage.setBackgroundColor(p.getDominantColor(Color.BLACK));
-                                mOriginalImage.setBackgroundColor(p.getDominantColor(Color.BLACK));
-                            }
-                        });
-                        mOriginalImage.setImageBitmap(mOrigBitmap);
-                        mPreviewImage.setImageBitmap(mImgBitmap);
-                    }
-                });
+
+
+        Palette.from(mOrigBitmap).generate(new Palette.PaletteAsyncListener() {
+            public void onGenerated(Palette p) {
+                mPreviewImage.setBackgroundColor(p.getDominantColor(Color.BLACK));
+                mOriginalImage.setBackgroundColor(p.getDominantColor(Color.BLACK));
             }
         });
+        intValues = new int[mImgBitmap.getWidth() * mImgBitmap.getHeight()];
+        floatValues = new float[mImgBitmap.getWidth() * mImgBitmap.getHeight() * 3];
+        mOriginalImage.setImageBitmap(mOrigBitmap);
+        mPreviewImage.setImageBitmap(mImgBitmap);
 
         shareButton = findViewById(R.id.share_button);
 
@@ -183,7 +173,7 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
                 mSelectedStyle = position;
                 progress = new ProgressDialog(ShowImageActivity.this);
                 progress.setTitle("Loading");
-                progress.setMessage("Applying your awesone style! Please wait!");
+                progress.setMessage("Applying your awesome style! Please wait!");
                 progress.setCancelable(false); // disable dismiss by tapping outside of the dialog
                 progress.show();
                 runInBackground(
@@ -239,12 +229,14 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
             }
         });
 
-        int statusBarHeight = getStatusBarHeight();
+        int statusBarHeight = getStatusBarHeight(getApplicationContext());
         ImageView statusBarBg = findViewById(R.id.statusBarBg);
         statusBarBg.getLayoutParams().height = statusBarHeight;
         statusBarBg.requestLayout();
 
-        int navigationBarHeight = getNavigationBarHeight();
+        Point statusBarSize = getNavigationBarSize(getApplicationContext());
+
+        int navigationBarHeight = statusBarSize!=null?statusBarSize.y:0;
         ImageView navigationBarBg = findViewById(R.id.navigartionBarBg);
         navigationBarBg.getLayoutParams().height = navigationBarHeight;
         navigationBarBg.requestLayout();
@@ -277,24 +269,6 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
         mRecyclerView.setLayoutParams(recyclerLayoutParams);
     }
 
-    public int getStatusBarHeight() {
-        int result = 0;
-        int resourceId = getResources().getIdentifier("status_bar_height", "dimen", "android");
-        if (resourceId > 0) {
-            result = getResources().getDimensionPixelSize(resourceId);
-        }
-        return result;
-    }
-
-    public int getNavigationBarHeight(){
-        int result = 0;
-        int resourceId = getResources().getIdentifier("navigation_bar_height", "dimen", "android");
-        if (resourceId > 0) {
-            result = getResources().getDimensionPixelSize(resourceId);
-        }
-        return result;
-    }
-
     private void loadStyleBitmaps(){
         for(int i=0;i<NUM_STYLES;i++){
             try{
@@ -312,6 +286,9 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
     public synchronized void onResume(){
         super.onResume();
         if(inferenceInterface==null) {
+            handlerThread = new HandlerThread("inference");
+            handlerThread.start();
+            handler = new Handler(handlerThread.getLooper());
             if (progress != null) progress.cancel();
             progress = new ProgressDialog(ShowImageActivity.this);
             progress.setTitle("Loading");
@@ -343,7 +320,11 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
         //bmOptions.inJustDecodeBounds = false;
         bmOptions.inMutable = true;
 
-        mImgBitmap = BitmapFactory.decodeFile(mImagePath, bmOptions);
+        mImgBitmap = ResultHolder.getImage();
+        if(mImgBitmap==null){
+            Toast.makeText(getApplicationContext(),"Some error occurred!",Toast.LENGTH_SHORT).show();
+            finish();
+        }
         int photoW = mImgBitmap.getWidth();
         int photoH = mImgBitmap.getHeight();
         int targetW;
@@ -351,7 +332,7 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
         if(photoW>photoH){
             targetH = getWindowManager().getDefaultDisplay().getWidth();
             if(targetH>photoH) {
-                mOrigBitmap = BitmapFactory.decodeFile(mImagePath, bmOptions);
+                mOrigBitmap = ResultHolder.getImage();
             }
             else{
                 targetW = targetH*photoW / photoH;
@@ -362,7 +343,7 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
         else {
             targetW = getWindowManager().getDefaultDisplay().getWidth();
             if(targetW>photoW){
-                mOrigBitmap = BitmapFactory.decodeFile(mImagePath, bmOptions);
+                mOrigBitmap = ResultHolder.getImage();
             }
             else {
                 targetH = targetW * photoH / photoW;

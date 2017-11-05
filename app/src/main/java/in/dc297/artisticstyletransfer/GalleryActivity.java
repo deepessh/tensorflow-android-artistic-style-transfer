@@ -2,6 +2,8 @@ package in.dc297.artisticstyletransfer;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 
@@ -42,13 +44,11 @@ public class GalleryActivity extends AppCompatActivity {
                 byte[] buffer = new byte[inputStream.available()];
                 inputStream.read(buffer);
 
-
-                OutputStream outStream = new FileOutputStream(mFile);
-                outStream.write(buffer);
-
-                Intent mIntent = new Intent(this,ShowImageActivity.class);
-                mIntent.putExtra("filepath",mFile.toString());
-                startActivity(mIntent);
+                Bitmap bitmap = BitmapFactory.decodeByteArray(buffer, 0, buffer.length);
+                ResultHolder.dispose();
+                ResultHolder.setImage(bitmap);
+                Intent intent = new Intent(getApplicationContext(), ShowImageActivity.class);
+                startActivity(intent);
             } catch (FileNotFoundException e) {
                 e.printStackTrace();
             } catch (IOException e) {

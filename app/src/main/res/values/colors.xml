@@ -5,6 +5,6 @@
     <color name="colorAccent">#FFFFFF</color>
     <color name="colorIcon">#FFFFFF</color>
     <color name="colorPrimaryTransparent">#40000000</color>
-    <color name="colorPrimaryDarkTransparent">#AA000000</color>
+    <color name="colorPrimaryDarkTransparent">#70000000</color>
     <color name="colorAccentTransparent">#FFFFFFFF</color>
 </resources>
