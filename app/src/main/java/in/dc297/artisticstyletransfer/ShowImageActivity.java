@@ -54,6 +54,8 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
     private static final String OUTPUT_NODE = "transformer/expand/conv3/conv/Sigmoid";
     private static final int NUM_STYLES = 26;
 
+    private int MY_DIVISOR = 8;
+
     private static final String TAG = "ShowImageActivity";
 
     private final float[] styleVals = new float[NUM_STYLES];
@@ -105,7 +107,7 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
 
         getPreview();
 
-
+        MY_DIVISOR = 1;//mImgBitmap.getHeight()/8;
 
         Palette.from(mOrigBitmap).generate(new Palette.PaletteAsyncListener() {
             public void onGenerated(Palette p) {
@@ -314,6 +316,7 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
     private Bitmap getPreview() {
 
         mImgBitmap = ResultHolder.getImage();
+        Log.i(ShowImageActivity.class.getName(),String.valueOf(ResultHolder.getTimeToCallback()));
         if(mImgBitmap==null){
             Toast.makeText(getApplicationContext(),"Some error occurred!",Toast.LENGTH_SHORT).show();
             finish();
@@ -366,30 +369,49 @@ public class ShowImageActivity extends Activity implements ActivityCompat.OnRequ
             }
             mImgBitmap.getPixels(intValues, 0, mImgBitmap.getWidth(), 0, 0, mImgBitmap.getWidth(), mImgBitmap.getHeight());
 
-            for (int i = 0; i < intValues.length; ++i) {
+            /*for (int i = 0; i < intValues.length; ++i) {
                 final int val = intValues[i];
                 floatValues[i * 3] = ((val >> 16) & 0xFF) / 255.0f;
                 floatValues[i * 3 + 1] = ((val >> 8) & 0xFF) / 255.0f;
                 floatValues[i * 3 + 2] = (val & 0xFF) / 255.0f;
-            }
+            }*/
 
-            // Copy the input data into TensorFlow.
-            inferenceInterface.feed(
-                    INPUT_NODE, floatValues, 1, mImgBitmap.getHeight(), mImgBitmap.getWidth(), 3);
-            inferenceInterface.feed(STYLE_NODE, styleVals, NUM_STYLES);
-            inferenceInterface.run(new String[]{OUTPUT_NODE}, isDebug());
-            floatValues = new float[mImgBitmap.getWidth() * (mImgBitmap.getHeight() + 10) * 3];//add a little buffer to the float array because tensorflow sometimes returns larger images than what is given as input
-            inferenceInterface.fetch(OUTPUT_NODE, floatValues);
+            for(int i=0;i<MY_DIVISOR;i++) {
+                float[] floatValuesInput = new float[floatValues.length/MY_DIVISOR];
+                int myArrayLength = intValues.length/MY_DIVISOR;
+                for(int x=0;x < myArrayLength;++x){
+                    final int myPos = x+i*myArrayLength;
+                    final int val = intValues[myPos];
+                    floatValuesInput[x * 3] = ((val >> 16) & 0xFF) / 255.0f;
+                    floatValuesInput[x * 3 + 1] = ((val >> 8) & 0xFF) / 255.0f;
+                    floatValuesInput[x * 3 + 2] = (val & 0xFF) / 255.0f;
+                }
+                Log.i(ShowImageActivity.class.getName(),"Sending following data to tensorflow : floarValuesInput length : " + floatValuesInput.length+" image bitmap height :" + mImgBitmap.getHeight() + " image bitmap width : " + mImgBitmap.getWidth());
+                // Copy the input data into TensorFlow.
+                inferenceInterface.feed(
+                        INPUT_NODE, floatValuesInput, 1, mImgBitmap.getHeight()/MY_DIVISOR, mImgBitmap.getWidth(), 3);
+                inferenceInterface.feed(STYLE_NODE, styleVals, NUM_STYLES);
+                inferenceInterface.run(new String[]{OUTPUT_NODE}, isDebug());
+                float[] floatValuesOutput = new float[floatValues.length/MY_DIVISOR];
+                //floatValuesOutput  = new float[mImgBitmap.getWidth() * (mImgBitmap.getHeight() + 10) * 3];//add a little buffer to the float array because tensorflow sometimes returns larger images than what is given as input
+                inferenceInterface.fetch(OUTPUT_NODE, floatValuesOutput);
 
-            for (int i = 0; i < intValues.length; ++i) {
-                intValues[i] =
-                        0xFF000000
-                                | (((int) (floatValues[i * 3] * 255)) << 16)
-                                | (((int) (floatValues[i * 3 + 1] * 255)) << 8)
-                                | ((int) (floatValues[i * 3 + 2] * 255));
+                for (int j = 0; j < myArrayLength; ++j) {
+                    intValues[j+i*myArrayLength] =
+                            0xFF000000
+                                    | (((int) (floatValuesOutput [(j) * 3] * 255)) << 16)
+                                    | (((int) (floatValuesOutput [(j) * 3 + 1] * 255)) << 8)
+                                    | ((int) (floatValuesOutput [(j) * 3 + 2] * 255));
+                }
+                //floatValues = new float[mImgBitmap.getWidth() * (mImgBitmap.getHeight()) * 3];
+                mImgBitmap.setPixels(intValues, 0, mImgBitmap.getWidth(), 0, 0, mImgBitmap.getWidth(), mImgBitmap.getHeight());
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        mPreviewImage.setImageBitmap(mImgBitmap);
+                    }
+                });
             }
-            floatValues = new float[mImgBitmap.getWidth() * (mImgBitmap.getHeight()) * 3];
-            mImgBitmap.setPixels(intValues, 0, mImgBitmap.getWidth(), 0, 0, mImgBitmap.getWidth(), mImgBitmap.getHeight());
         }
         else{
             mImgBitmap = bitmapCache.get("style_"+String.valueOf(mSelectedStyle));

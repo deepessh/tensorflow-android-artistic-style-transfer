@@ -45,9 +45,7 @@ public class CameraActivity extends AppCompatActivity{
 
         mCameraView = findViewById(R.id.camera);
 
-        //mCameraView.setFocus(CameraKit.Constants.FOCUS_CONTINUOUS);
-
-        mCameraView.setMethod(CameraKit.Constants.METHOD_SPEED);
+        mCameraView.setMethod(CameraKit.Constants.METHOD_STILL);
 
         mCameraView.setCropOutput(true);
 
